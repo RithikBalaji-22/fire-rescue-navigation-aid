@@ -1,0 +1,107 @@
+/*-------------------------------------------------------------
+  Project: Fire Rescue Sonar Navigation Aid
+  Board: Arduino Uno
+  Components: 3 x Ultrasonic Sensors (HC-SR04), Buzzer, Vibration Motor
+  Description:
+    A sonar-based obstacle detection and alert system
+    designed to aid fire rescue personnel in smoke-filled
+    or zero-visibility environments.
+--------------------------------------------------------------*/
+
+#define TRIG_LEFT 2
+#define ECHO_LEFT 3
+
+#define TRIG_CENTER 4
+#define ECHO_CENTER 5
+
+#define TRIG_RIGHT 6
+#define ECHO_RIGHT 7
+
+#define BUZZER 8
+#define VIBRATION 9
+
+// Distance thresholds in centimeters
+#define DANGER_DISTANCE 30
+#define WARNING_DISTANCE 80
+#define SAFE_DISTANCE 150
+
+// Function to measure distance using ultrasonic sensor
+long getDistance(int trigPin, int echoPin) {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH, 30000); // 30ms timeout
+  long distance = duration * 0.034 / 2;          // Convert to cm
+  return distance;
+}
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(TRIG_LEFT, OUTPUT);
+  pinMode(ECHO_LEFT, INPUT);
+  pinMode(TRIG_CENTER, OUTPUT);
+  pinMode(ECHO_CENTER, INPUT);
+  pinMode(TRIG_RIGHT, OUTPUT);
+  pinMode(ECHO_RIGHT, INPUT);
+
+  pinMode(BUZZER, OUTPUT);
+  pinMode(VIBRATION, OUTPUT);
+
+  Serial.println("Fire Rescue Sonar Navigation Aid Initialized...");
+}
+
+void loop() {
+  long leftDist = getDistance(TRIG_LEFT, ECHO_LEFT);
+  long centerDist = getDistance(TRIG_CENTER, ECHO_CENTER);
+  long rightDist = getDistance(TRIG_RIGHT, ECHO_RIGHT);
+
+  Serial.print("Left: ");
+  Serial.print(leftDist);
+  Serial.print(" cm | Center: ");
+  Serial.print(centerDist);
+  Serial.print(" cm | Right: ");
+  Serial.print(rightDist);
+  Serial.println(" cm");
+
+  // Find minimum distance (closest obstacle)
+  long minDist = min(leftDist, min(centerDist, rightDist));
+
+  // Alert logic based on minimum distance
+  if (minDist <= DANGER_DISTANCE && minDist > 0) {
+    // Danger zone — continuous buzzer + strong vibration
+    tone(BUZZER, 1000);
+    analogWrite(VIBRATION, 255);
+    Serial.println("⚠️ DANGER! Obstacle very close.");
+  } 
+  else if (minDist <= WARNING_DISTANCE && minDist > DANGER_DISTANCE) {
+    // Warning zone — intermittent buzzer + mild vibration
+    tone(BUZZER, 800);
+    analogWrite(VIBRATION, 180);
+    delay(200);
+    noTone(BUZZER);
+    analogWrite(VIBRATION, 0);
+    delay(200);
+    Serial.println("⚠️ WARNING! Obstacle nearby.");
+  } 
+  else if (minDist <= SAFE_DISTANCE && minDist > WARNING_DISTANCE) {
+    // Safe zone — short beeps, minimal vibration
+    tone(BUZZER, 600);
+    analogWrite(VIBRATION, 100);
+    delay(100);
+    noTone(BUZZER);
+    analogWrite(VIBRATION, 0);
+    delay(500);
+    Serial.println("ℹ️ Object detected at safe distance.");
+  } 
+  else {
+    // No object detected
+    noTone(BUZZER);
+    analogWrite(VIBRATION, 0);
+  }
+
+  delay(200);
+}
